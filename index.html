@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Progress 2026-2039</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <style>
+        :root {
+            --bg: #000000;
+            --past: #000000;    /* Solid Black */
+            --today: #00ffff;   /* Cyan */
+            --future: #ffffff;  /* White */
+        }
+        * { box-sizing: border-box; }
+        body, html { margin: 0; padding: 0; font-family: 'Arial', sans-serif; background: var(--bg); color: #fff; width: 100%; height: 100%; overflow: hidden; }
+        
+        .menu-btn { position: fixed; top: 15px; left: 15px; cursor: pointer; z-index: 1001; background: #222; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--today); color: var(--today); font-size: 20px; }
+        
+        .sidebar { position: fixed; left: -260px; top: 0; width: 250px; height: 100%; background: #111; transition: 0.3s; z-index: 1000; padding-top: 60px; border-right: 1px solid #333; overflow-y: auto; }
+        .sidebar.active { left: 0; }
+        .sidebar-item { padding: 12px 25px; cursor: pointer; border-bottom: 1px solid #222; font-size: 14px; color: #ccc; }
+        .sidebar-item:hover { background: var(--today); color: #000; }
+
+        .app-container { width: 100%; max-width: 450px; margin: 0 auto; padding: 10px; text-align: center; height: 100vh; display: flex; flex-direction: column; justify-content: space-between; }
+        
+        .header-section { margin-top: 10px; }
+        .logo { width: 45px; height: 45px; border-radius: 10px; border: 1.5px solid var(--today); margin-bottom: 2px; }
+        .live-date { font-size: 1rem; color: var(--today); margin-top: 5px; font-weight: bold; }
+        .live-info { font-size: 1.8rem; font-weight: bold; letter-spacing: 2px; color: #fff; margin: 2px 0; }
+        .progress-text { font-size: 0.75rem; color: #aaa; margin-bottom: 8px; text-transform: uppercase; font-weight: bold; }
+
+        .day-grid { 
+            display: grid; 
+            grid-template-columns: repeat(15, 1fr); 
+            gap: 3px; 
+            background: #000;
+            padding: 8px;
+            border: 1px solid #222;
+            border-radius: 8px;
+            height: 65vh; 
+            overflow-y: auto;
+        }
+        
+        .day-box { aspect-ratio: 1/1; border-radius: 1px; border: 0.1px solid #222; }
+        .past { background: var(--past); border: 0.5px solid #333; } 
+        .today { background: var(--today); box-shadow: 0 0 15px var(--today); border: 1px solid #fff; position: relative; z-index: 2; }
+        .future { background: var(--future); border: 0.5px solid #ddd; }
+
+        .save-btn { width: 90%; background: var(--today); color: #000; border: none; padding: 15px; border-radius: 30px; font-weight: bold; cursor: pointer; margin: 10px auto; text-transform: uppercase; letter-spacing: 1px; }
+        .day-grid::-webkit-scrollbar { display: none; }
+    </style>
+</head>
+<body>
+
+    <div class="menu-btn" onclick="document.getElementById('sidebar').classList.toggle('active')">☰</div>
+
+    <div class="sidebar" id="sidebar">
+        <div style="padding: 15px 25px; color: var(--today); font-weight: bold; font-size: 12px;">SELECT YEAR</div>
+        <div id="year-list"></div>
+    </div>
+
+    <div class="app-container" id="capture-area">
+        <div class="header-section">
+            <img src="https://via.placeholder.com/50/00ffff/000000?text=GOAL" alt="Logo" class="logo">
+            <h1 id="displayYear" style="margin: 0; font-size: 1.6rem; color: var(--today); display: none;">2026</h1>
+            <div id="liveDate" class="live-date">Monday, 2 March 2026</div>
+            <div class="live-info" id="liveClock">20:55:00</div>
+            <div class="progress-text" id="statsText">Calculating...</div>
+        </div>
+
+        <div class="day-grid" id="dayGrid"></div>
+
+        <button class="save-btn" onclick="downloadWallpaper()">Save Wallpaper</button>
+    </div>
+
+    <script>
+        let selectedYear = parseInt(localStorage.getItem('selectedYear')) || 2026;
+
+        function updateClock() {
+            const now = new Date();
+            // Clock
+            document.getElementById('liveClock').innerText = now.toLocaleTimeString('en-GB', { hour12: false });
+            // Full Date
+            const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+            document.getElementById('liveDate').innerText = now.toLocaleDateString('en-GB', options);
+        }
+        setInterval(updateClock, 1000);
+
+        const yearList = document.getElementById('year-list');
+        for (let y = 2026; y <= 2039; y++) {
+            let div = document.createElement('div');
+            div.className = 'sidebar-item';
+            div.innerText = "Year " + y;
+            div.onclick = () => { 
+                selectedYear = y; 
+                localStorage.setItem('selectedYear', y); 
+                document.getElementById('sidebar').classList.remove('active');
+                initGrid(); 
+            };
+            yearList.appendChild(div);
+        }
+
+        function initGrid() {
+            const grid = document.getElementById('dayGrid');
+            const statsText = document.getElementById('statsText');
+            grid.innerHTML = '';
+
+            const isLeap = (year) => (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+            const totalDays = isLeap(selectedYear) ? 366 : 365;
+            
+            const now = new Date();
+            const startOfYear = new Date(selectedYear, 0, 1);
+            
+            // Fast Calculation Logic
+            // Difference in time divided by ms in a day
+            let dayOfToday = Math.floor((now - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
+            
+            // Year check for display logic
+            if (now.getFullYear() > selectedYear) dayOfToday = totalDays + 1;
+            if (now.getFullYear() < selectedYear) dayOfToday = -1;
+
+            let fastCount = 0;
+            for (let i = 1; i <= totalDays; i++) {
+                const box = document.createElement('div');
+                box.className = 'day-box';
+                
+                if (i < dayOfToday) {
+                    box.classList.add('past'); // Fast Days (Black)
+                    fastCount++;
+                } else if (i === dayOfToday && now.getFullYear() === selectedYear) {
+                    box.classList.add('today'); // Present Day (Cyan)
+                } else {
+                    box.classList.add('future'); // Future (White)
+                }
+                grid.appendChild(box);
+            }
+
+            // Stats Update
+            let percent = ((fastCount / totalDays) * 100).toFixed(1);
+            statsText.innerText = `${fastCount} DAYS FAST | ${totalDays - fastCount} REMAIN | ${percent}% DONE`;
+        }
+
+        async function downloadWallpaper() {
+            const area = document.getElementById('capture-area');
+            const canvas = await html2canvas(area, { backgroundColor: '#000', scale: 3 });
+            const link = document.createElement('a');
+            link.download = `Progress_${selectedYear}.png`;
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        initGrid();
+        updateClock();
+function initGrid() {
+    const grid = document.getElementById('dayGrid');
+    const statsText = document.getElementById('statsText');
+    grid.innerHTML = '';
+
+    const isLeap = (year) => (year % 4 === 0 && year % 100 !== 0) || (year % 400 === 0);
+    const totalDays = isLeap(selectedYear) ? 366 : 365;
+    
+    const now = new Date();
+    const startOfYear = new Date(selectedYear, 0, 1);
+    
+    // Correct logic for March 2nd to show 61/62 context
+    let dayOfToday = Math.floor((now - startOfYear) / (1000 * 60 * 60 * 24)) + 1;
+    
+    if (now.getFullYear() > selectedYear) dayOfToday = totalDays + 1;
+    if (now.getFullYear() < selectedYear) dayOfToday = -1;
+
+    let fastCount = 0;
+    for (let i = 1; i <= totalDays; i++) {
+        const box = document.createElement('div');
+        box.className = 'day-box';
+        
+        // Agar aaj 61th day hai, toh 60 boxes black honge
+        if (i < dayOfToday) {
+            box.classList.add('past'); 
+            fastCount++;
+        } else if (i === dayOfToday && now.getFullYear() === selectedYear) {
+            box.classList.add('today'); 
+        } else {
+            box.classList.add('future'); 
+        }
+        grid.appendChild(box);
+    }
+
+    // Is line ko update karein taaki aaj ka din bhi 'Fast' mein dikhe agar aap chahte hain
+    let displayFast = fastCount + 1; // March 2 ko include karke 61 dikhayega
+    let percent = ((displayFast / totalDays) * 100).toFixed(1);
+    statsText.innerText = `${displayFast} DAYS FAST | ${totalDays - displayFast} REMAIN | ${percent}% DONE`;
+}
+
+// 12-Hour format Clock (20:00 ko 08:00 PM karne ke liye)
+function updateClock() {
+    const now = new Date();
+    document.getElementById('liveClock').innerText = now.toLocaleTimeString('en-GB', { 
+        hour: '2-digit', 
+        minute: '2-digit', 
+        second: '2-digit', 
+        hour12: true 
+    });
+    const options = { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' };
+    document.getElementById('liveDate').innerText = now.toLocaleDateString('en-GB', options);
+}
+
+    </script>
+</body>
+</html>
